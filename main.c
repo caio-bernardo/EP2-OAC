@@ -6,15 +6,15 @@ double to_float(const char *string);
 void to_string(double, char *const, int);
 int count_lines(FILE *f);
 
+
 int main(void) {
     // abra o arquivo numbers.txt
     FILE * numbers = fopen("numbers.txt", "r");
-    FILE * output = fopen("output.txt", "w+");
 
     // Descobre quantos elementos o arquivo possui
-    int capacity = count_lines(numbers);
+    int capacity = count_lines(numbers) + 1;
     // Aloca o tamanho necessário de elementos
-    double *array = malloc(sizeof(float) * capacity);
+    double *array = malloc(sizeof(double) * capacity);
     int len = 0;
 
     char buffer[512];
@@ -22,23 +22,33 @@ int main(void) {
 
     for (char c = fgetc(numbers); c != EOF; c = fgetc(numbers)) {
         if (c == '\n') {
+            // Reseta o buffer ao chegar no fim da linha
             buffer[idx] = '\0';
             idx = 0;
 
+            // adiciona o conteudo do buffer no array
             array[len++] = to_float(buffer);
         } else {
+            // Adiciona o caracter lido no buffer
             buffer[idx++] = c;
         }
     }
 
+    // Ordena o array
     double * array_ord = ordena(array, len, 0);
 
+    // Escreve o resultado
+    // TODO: substituir pelo arquivo de input no modo de append
+    FILE * output = fopen("output.txt", "w");
     for (int i = 0; i < len; i++) {
+        // Converte para string
         to_string(array_ord[i], buffer, 512);
+        // Escreve no arquivo
         fputs(buffer, output);
         fputc('\n', output);
     }
 
+    // Libera memória e fecha os arquivos
     free(array);
     free(array_ord);
     fclose(numbers);
@@ -46,7 +56,7 @@ int main(void) {
 }
 
 // Algoritmo de ordenação Bubble Sort
-void bubblesort(float *vetor, int tam) {
+void bubblesort(double *vetor, int tam) {
     // BubbleSort
     for (int i = 0; i < tam - 1; i++) {
         for (int j = 0; j < tam - i - 1; j++) {
@@ -60,10 +70,10 @@ void bubblesort(float *vetor, int tam) {
 }
 
 // Algoritmo de ordenação Quick Sort
-void quicksort(float *vetor, int low, int high) {
+void quicksort(double *vetor, int low, int high) {
     if (low < high) {
         // Pivot (elemento central)
-        float pivot = vetor[(low + high) / 2];
+        double pivot = vetor[(low + high) / 2];
 
         // Partition
         int i = low, j = high;
@@ -73,7 +83,7 @@ void quicksort(float *vetor, int low, int high) {
 
             if (i <= j) {
                 // Swap
-                float temp = vetor[i];
+                double temp = vetor[i];
                 vetor[i] = vetor[j];
                 vetor[j] = temp;
                 i++;
@@ -152,55 +162,35 @@ double to_float(const char *string) {
 }
 
 // Converte um double para uma string modificando a string passada como parametro
-void to_string(double num, char *const string, int string_size) {
+void to_string(double number, char *const string, int string_size) {
+    double num = number;
     int pos = 0;
-
     // Caso num é negativo
     if (num < 0.0) {
         string[pos++] = '-';
         num = -num;
     }
 
-    long long parte_inteira = (long long)num;
-    double parte_fracionada = num - parte_inteira;
-
-    // Converter parte inteira para string
-    if (parte_inteira == 0) {
-        // Caso especial: número zero
-        string[pos++] = '0';
-    } else {
-        // Contar quantos dígitos tem na parte inteira
-        int count = 0;
-        long long temp = parte_inteira;
-        while (temp > 0) {
-            temp /= 10;
-            count++;
-        }
-
-        // Converter dígito a dígito, começando do dígito mais significativo
-        temp = parte_inteira;
-        int digit_pos = pos + count - 1;
-        while (temp > 0) {
-            string[digit_pos--] = '0' + (temp % 10);
-            temp /= 10;
-        }
-        pos += count;
+    int float_position = 0;
+    while (num > 10) {
+        num /= 10.0;
+        float_position++;
     }
+    int dot_position = float_position + pos + 1;
+    string[dot_position] = '.';
 
-    // Adicionar a parte fracionada
-    if (parte_fracionada > 0.0) {
-        string[pos++] = '.';
-        int count_precision = 0;
-        while (parte_fracionada > 0 && count_precision < 6) { // limitar para 6 casas decimais
-            parte_fracionada *= 10;
-            int digit = (int)parte_fracionada;
-            string[pos++] = '0' + digit;
-            parte_fracionada -= digit;
-            count_precision++;
+    while (num != 0.0 && pos < string_size - 2) {
+        int parte_inteira = (int)num;
+
+        if (pos == dot_position) {
+            pos++;
         }
+        string[pos++] = parte_inteira + '0';
+
+        num -= (double)parte_inteira;
+        num *= 10.0;
     }
 
     // Finalizar a string
     string[pos] = '\0';
-
 }
