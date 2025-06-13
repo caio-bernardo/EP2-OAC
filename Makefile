@@ -1,5 +1,5 @@
 
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -g
 
 all: main
 	./main
@@ -8,4 +8,3 @@ all: main
 
 
 %.o: %.c
-
