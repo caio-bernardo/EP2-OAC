@@ -14,12 +14,13 @@ Ler um arquivo de números de ponto flutante, ordená-los e escrever de volta no
   - [x] função double para string
 
 - [ ] Implementar funções Assembly
-  - [ ] função _main_
+  - [x] função _main_
   - [ ] função _ordena_
   - [ ] função _bubblesort_
   - [ ] função _quicksort_
   - [ ] função _to_string_
   - [ ] função _to_double_
+  - [ ] função _count_lines_
   - [x] função _fgetc_
 
 ## Como rodar
