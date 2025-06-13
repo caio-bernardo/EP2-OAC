@@ -143,6 +143,9 @@
         jr $ra
 
     # FUNÇÃO to_string
+    # @param .double number : Double a ser convertido
+    # @param .word string : Endereço do buffer a ser preenchido
+    # @para .word string_size : Tamanho do buffer passado
     to_string:
         #TODO: implementar
 

@@ -7,11 +7,11 @@ Ler um arquivo de números de ponto flutante, ordená-los e escrever de volta no
 
 ## Tarefas
 
-- [ ] Implementar funções em C
+- [x] Implementar funções em C
   - [x] ler arquivo
   - [x] métodos de ordenação
   - [x] string para double
-  - [ ] função double para string
+  - [x] função double para string
 
 - [ ] Implementar funções Assembly
   - [ ] função _main_
