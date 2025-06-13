@@ -3,7 +3,7 @@
 
 double *ordena(double *vetor, int tam, int tipo);
 double to_float(const char *string);
-void to_string(double, char *const, int);
+int to_string(double, char *const, int);
 int count_lines(FILE *f);
 
 
@@ -18,19 +18,19 @@ int main(void) {
     int len = 0;
 
     char buffer[512];
-    int idx = 0;
+    int buffer_pos = 0;
 
     for (char c = fgetc(numbers); c != EOF; c = fgetc(numbers)) {
         if (c == '\n') {
             // Reseta o buffer ao chegar no fim da linha
-            buffer[idx] = '\0';
-            idx = 0;
+            buffer[buffer_pos] = '\0';
+            buffer_pos = 0;
 
             // adiciona o conteudo do buffer no array
             array[len++] = to_float(buffer);
         } else {
             // Adiciona o caracter lido no buffer
-            buffer[idx++] = c;
+            buffer[buffer_pos++] = c;
         }
     }
 
@@ -161,8 +161,9 @@ double to_float(const char *string) {
     return sign * result;
 }
 
-// Converte um double para uma string modificando a string passada como parametro
-void to_string(double number, char *const string, int string_size) {
+// Converte um double para uma string modificando a string passada como parametro.
+// Retorna o novo tamanho da string
+int to_string(double number, char *const string, int string_size) {
     double num = number;
     int pos = 0;
     // Caso num é negativo
@@ -193,4 +194,5 @@ void to_string(double number, char *const string, int string_size) {
 
     // Finalizar a string
     string[pos] = '\0';
+    return pos;
 }
