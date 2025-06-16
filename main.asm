@@ -12,6 +12,13 @@
     NULL_CHAR: .byte 0
     SIZE_OF_DOUBLE: .word 8 # Tamanho em bytes de um double
 
+    # Para função to_float 
+    TEN_DOUBLE:        .double 10.0
+    ONE_TENTH_DOUBLE:  .double 0.1
+    DOT_CHAR:          .byte '.'
+    NINE_CHAR:         .byte '9'
+    MINUS_CHAR:        .byte '-'
+
 .text
     .globl main
 
@@ -193,8 +200,68 @@
     # @param .word ($a0) vetor: Vetor de double a ser ordenado
     # @param .word ($a1) tam: Tamanho do vetor
     bubblesort:
-        # TODO: implementar essa função
-        jr $ra
+    # --- salva registradores que serão usados ---
+    addi $sp, $sp, -20
+    sw $ra, 0($sp)    # Salva endereço de retorno
+    sw $s0, 4($sp)    # Salva $s0 (usado para vetor)
+    sw $s1, 8($sp)    # Salva $s1 (usado para tamanho)
+    sw $s2, 12($sp)   # Salva $s2 (contador i)
+    sw $s3, 16($sp)   # Salva $s3 (contador j)
+
+    # Inicializa registradores com argumentos
+    move $s0, $a0     # $s0 = vetor
+    move $s1, $a1     # $s1 = tamanho
+    blez $s1, BUBBLE_END_FOR_I   # ignora vetor vazio ou de 1 elemento
+
+    # --- Loop externo: for (int i = 0; i < tam - 1; i++) ---
+    li $s2, 0         # i = 0
+
+    BUBBLE_FOR_I:
+    addi $t0, $s1, -1     # t0 = tam - 1
+    bge $s2, $t0, BUBBLE_END_FOR_I  # if (i >= tam - 1) break
+
+    # --- Loop interno: for (int j = 0; j < tam - i - 1; j++) ---
+    li $s3, 0         # j = 0
+
+    BUBBLE_FOR_J:
+    sub $t0, $s1, $s2     # t0 = tam - i
+    addi $t0, $t0, -1     # t0 = tam - i - 1
+    bge $s3, $t0, BUBBLE_END_FOR_J  # if (j >= tam - i - 1) break
+
+    # --- Comparação: if (vetor[j] > vetor[j+1]) ---
+    sll $t1, $s3, 3       # t1 = j * 8 (doubles têm 8 bytes)
+    add $t1, $s0, $t1     # t1 = &vetor[j]
+
+    add $t2, $t1, 8       # t2 = &vetor[j+1]
+
+    l.d $f2, 0($t1)       # f2 = vetor[j]
+    l.d $f4, 0($t2)       # f4 = vetor[j+1]
+
+    c.le.d $f2, $f4       # if (f2 <= f4) pular swap
+    bc1t BUBBLE_NO_SWAP
+
+    # --- Swap vetor[j] e vetor[j+1] ---
+    s.d $f4, 0($t1)       # vetor[j] = vetor[j+1]
+    s.d $f2, 0($t2)       # vetor[j+1] = vetor[j]
+
+    BUBBLE_NO_SWAP:
+    addi $s3, $s3, 1      # j++
+    b BUBBLE_FOR_J
+
+    BUBBLE_END_FOR_J:
+    addi $s2, $s2, 1      # i++
+    b BUBBLE_FOR_I
+
+    BUBBLE_END_FOR_I:
+    # --- restaura registradores e retorna ---
+    move $v0, $s0 # retorna o ponteiro do vetor em $v0
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    lw $s3, 16($sp)
+    addi $sp, $sp, 20
+    jr $ra
 
     # FUNÇÃO quicksort
     # Realiza uma ordenação quick sort
@@ -242,8 +309,91 @@
     # @param .word string ($a0) : Endereço para a string
     # @return .double ($f0): Valor em Double resultante
     to_float:
-        # TODO: implementar
+        # Registradores:
+        # $a0: endereço da string
+        # $f0: resultado (result)
+        # $f2: valor do dígito convertido para double
+        # $f4: 10.0
+        # $f6: parte_decimal
+        # $t0: ponteiro para o char atual na string
+        # $t1: char atual
+        # $t2: sinal (1.0 ou -1.0)
+        
+        # Inicialização
+        l.d $f0, 0.0 # result = 0.0
+        l.d $f8, 1.0 # Usado para o sinal
+        move $t0, $a0 # $t0 aponta para o início da string
 
+        # Carrega constantes
+        l.d $f4, TEN_DOUBLE # f4 = 10.0
+        
+        # Confere sinal
+        lb $t1, 0($t0) # t1 = string[0]
+        lb $t3, MINUS_CHAR
+        bne $t1, $t3, TF_Parte_Inteira_LOOP # if (char != '-') pula
+        
+        # É negativo
+        li $t8, -1        # Se for '-', define o sinal como -1
+        mtc1 $t8, $f8
+        cvt.d.w $f8, $f8  # $f8 = -1.0 (covertido para double)
+        addi $t0, $t0, 1  # i++
+
+    TF_Parte_Inteira_LOOP:
+        lb $t1, 0($t0)
+        beqz $t1, TF_APPLY_SIGN    # detecta o fim da string ($t1 == 0)
+        lb $t3, ZERO_CHAR
+        blt $t1, $t3, TF_CHECK_DOT # if (char < '0') sai do loop
+        lb $t3, NINE_CHAR
+        bgt $t1, $t3, TF_CHECK_DOT # if (char > '9') sai do loop
+
+        # result = result * 10.0
+        mul.d $f0, $f0, $f4
+        
+        # Converte char para int, depois para double
+        sub $t1, $t1, ZERO_CHAR
+        mtc1 $t1, $f2
+        cvt.d.w $f2, $f2    # converteu para double
+        
+        # result += (double)digit
+        add.d $f0, $f0, $f2  # Adiciona ao resultado
+        
+        addi $t0, $t0, 1 # i++
+        b TF_Parte_Inteira_LOOP
+
+    TF_CHECK_DOT:
+        lb $t1, 0($t0)    # Recarrega caractere
+        lb $t3, DOT_CHAR  # Pega '.'
+        bne $t1, $t3, TF_APPLY_SIGN # if (char != '.') pula parte decimal
+
+        # Processa parte decimal
+        addi $t0, $t0, 1 # i++ (pula o '.')
+        l.d $f6, ONE_TENTH_DOUBLE # parte_decimal = 0.1
+
+    TF_Parte_Decimal_LOOP:
+        lb $t1, 0($t0)
+        beqz $t1, TF_APPLY_SIGN     # detecta o fim da string ($t1 == 0)
+        lb $t3, ZERO_CHAR
+        blt $t1, $t3, TF_APPLY_SIGN # if (char < '0') sai do loop
+        lb $t3, NINE_CHAR
+        bgt $t1, $t3, TF_APPLY_SIGN # if (char > '9') sai do loop
+        
+        # Converte char para int, depois para double
+        sub $t1, $t1, ZERO_CHAR
+        mtc1 $t1, $f2
+        cvt.d.w $f2, $f2
+
+        # result += (double)digit * parte_decimal
+        mul.d $f2, $f2, $f6
+        add.d $f0, $f0, $f2
+
+        # parte_decimal *= 0.1 (ou parte_decimal /= 10.0)
+        div.d $f6, $f6, $f4
+
+        addi $t0, $t0, 1 # i++
+        b TF_Parte_Decimal_LOOP
+
+    TF_APPLY_SIGN:
+        mul.d $f0, $f0, $f8 # result = result * sinal
         jr $ra
 
     # FUNÇÃO to_string
