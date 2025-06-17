@@ -536,7 +536,7 @@
 
         _TF_Parte_Inteira_LOOP:
             lb $t1, 0($t0)
-            beqz $t1, _TF_APPLY_SIGN    # detecta o fim da string ($t1 == 0)
+            beq $t1, $zero, _TF_APPLY_SIGN    # detecta o fim da string ($t1 == 0)
             lb $t3, ZERO_CHAR
             blt $t1, $t3, _TF_CHECK_DOT # if (char < '0') sai do loop
             lb $t3, NINE_CHAR
