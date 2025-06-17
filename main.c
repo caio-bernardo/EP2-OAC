@@ -39,6 +39,7 @@ int main(void) {
 
     // Escreve o resultado
     // TODO: substituir pelo arquivo de input no modo de append
+    // FILE * output = fopen("numbers.txt", "a");
     FILE * output = fopen("output.txt", "w");
     for (int i = 0; i < len; i++) {
         // Converte para string

@@ -38,7 +38,7 @@
         move $a0, $t0
         li $v0, 9
         syscall
-        move $s6, $v0
+        move $s6, $v0 # $s6 = double*
         li $s5, 0 # Tamanho atual do array. $s5 = 0
         # NOTA: No MARS não é preciso desalocar a memória alocada no heap
 
