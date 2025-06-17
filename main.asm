@@ -21,6 +21,9 @@
     NINE_CHAR:         .byte '9'
     MINUS_CHAR:        .byte '-'
 
+    BUBBLE_SORT: .word 0
+    QUICK_SORT: .word 1
+
 .text
     .globl main
 
