@@ -20,9 +20,11 @@
     DOT_CHAR:          .byte '.'
     NINE_CHAR:         .byte '9'
     MINUS_CHAR:        .byte '-'
+    NEG_ONE_DOUBLE:    .double -1.0
+    digit_doubles:     .double 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0
 
-    BUBBLE_SORT: .word 0
-    QUICK_SORT: .word 1
+    BUBBLE_SORT:       .word 0
+    QUICK_SORT:        .word 1
 
 .text
     .globl main
@@ -269,52 +271,53 @@
         sw $s3, 16($sp)   # Salva $s3 (contador j)
 
         # Inicializa registradores com argumentos
-        move $s0, $a0     # $s0 = vetor
-        move $s1, $a1     # $s1 = tamanho
-        blez $s1, _BUBBLE_END_FOR_I   # ignora vetor vazio ou de 1 elemento
+        addu $s0, $a0, $zero    # $s0 = vetor
+        slt $at, $zero, $s1     # $at = 1 se $s1 > 0
+        beq $at, $zero, _BUBBLE_END_FOR_I # if ($s1 <= 0) pula tudo
 
         # --- Loop externo: for (int i = 0; i < tam - 1; i++) ---
-        li $s2, 0         # i = 0
+        addu $s2, $zero, $zero  # i = 0
 
         _BUBBLE_FOR_I:
-        addi $t0, $s1, -1     # t0 = tam - 1
-        bge $s2, $t0, _BUBBLE_END_FOR_I  # if (i >= tam - 1) break
+        addi $t0, $s1, -1                 # t0 = tam - 1
+        slt $at, $s2, $t0                 # $at = 1 se i < tam - 1
+        beq $at, $zero, _BUBBLE_END_FOR_I # if (i >= tam - 1) break
 
         # --- Loop interno: for (int j = 0; j < tam - i - 1; j++) ---
-        li $s3, 0         # j = 0
+        addu $s3, $zero, $zero  # j = 0
 
         _BUBBLE_FOR_J:
-        sub $t0, $s1, $s2     # t0 = tam - i
-        addi $t0, $t0, -1     # t0 = tam - i - 1
-        bge $s3, $t0, _BUBBLE_END_FOR_J  # if (j >= tam - i - 1) break
+        sub $t0, $s1, $s2       # t0 = tam - i
+        addi $t0, $t0, -1       # t0 = tam - i - 1
+        slt $at, $s3, $t0       # $at = 1 se j < tam - i - 1
+        beq $at, $zero, _BUBBLE_END_FOR_J # if (j >= tam - i - 1) break
 
         # --- Comparação: if (vetor[j] > vetor[j+1]) ---
-        sll $t1, $s3, 3       # t1 = j * 8 (doubles têm 8 bytes)
-        add $t1, $s0, $t1     # t1 = &vetor[j]
+        sll $t1, $s3, 3         # t1 = j * 8 (doubles têm 8 bytes)
+        add $t1, $s0, $t1       # t1 = &vetor[j]
+        add $t2, $t1, 8         # t2 = &vetor[j+1]
 
-        add $t2, $t1, 8       # t2 = &vetor[j+1]
+        l.d $f2, 0($t1)         # f2 = vetor[j]
+        l.d $f4, 0($t2)         # f4 = vetor[j+1]
 
-        l.d $f2, 0($t1)       # f2 = vetor[j]
-        l.d $f4, 0($t2)       # f4 = vetor[j+1]
-
-        c.le.d $f2, $f4       # if (f2 <= f4) pular swap
-        bc1t _BUBBLE_NO_SWAP
+        c.lt.d $f4, $f2         # CC = 1 se vetor[j] > vetor[j+1]
+        bc1f _BUBBLE_NO_SWAP    # branch se CC==0 ⇔ vetor[j] <= vetor[j+1]
 
         # --- Swap vetor[j] e vetor[j+1] ---
-        s.d $f4, 0($t1)       # vetor[j] = vetor[j+1]
-        s.d $f2, 0($t2)       # vetor[j+1] = vetor[j]
+        s.d $f4, 0($t1)         # vetor[j] = vetor[j+1]
+        s.d $f2, 0($t2)         # vetor[j+1] = vetor[j]
 
         _BUBBLE_NO_SWAP:
-        addi $s3, $s3, 1      # j++
-        b _BUBBLE_FOR_J
+        addi $s3, $s3, 1        # j++
+        beq $zero, $zero, _BUBBLE_FOR_J
 
         _BUBBLE_END_FOR_J:
-        addi $s2, $s2, 1      # i++
-        b _BUBBLE_FOR_I
+        addi $s2, $s2, 1        # i++
+        beq $zero, $zero, _BUBBLE_FOR_I
 
         _BUBBLE_END_FOR_I:
         # --- restaura registradores e retorna ---
-        move $v0, $s0 # retorna o ponteiro do vetor em $v0
+        addu $v0, $s0, $zero 
         lw $ra, 0($sp)
         lw $s0, 4($sp)
         lw $s1, 8($sp)
@@ -511,51 +514,56 @@
         # $f2: valor do dígito convertido para double
         # $f4: 10.0
         # $f6: parte_decimal
+        # $f8: sinal (1.0 ou -1.0)
         # $t0: ponteiro para o char atual na string
         # $t1: char atual
-        # $t2: sinal (1.0 ou -1.0)
+        # $t2: temporário para cálculo de endereço
+        # $t3: temporário para carregar constantes ou endereço base
 
         # Inicialização
-        l.d $f0, ZERO_DOUBLE # result = 0.0
-        l.d $f8, ONE_DOUBLE # Usado para o sinal
-        move $t0, $a0 # $t0 aponta para o início da string
+        l.d $f0, ZERO_DOUBLE            # result = 0.0
+        l.d $f8, ONE_DOUBLE             # Usado para o sinal
+        addu $t0, $a0, $zero            # $t0 aponta para o início da string
 
         # Carrega constantes
-        l.d $f4, TEN_DOUBLE # f4 = 10.0
+        l.d $f4, TEN_DOUBLE             # f4 = 10.0
 
         # Confere sinal
-        lb $t1, 0($t0) # t1 = string[0]
+        lb $t1, 0($t0)                  # t1 = string[0]
         lb $t3, MINUS_CHAR
-        bne $t1, $t3, _TF_Parte_Inteira_LOOP # if (char != '-') pula
+        bne $t1, $t3, _TF_Parte_Inteira_LOOP    # if (char != '-') pula
 
         # É negativo
-        li $t8, -1        # Se for '-', define o sinal como -1
-        mtc1 $t8, $f8
-        cvt.d.w $f8, $f8  # $f8 = -1.0 (covertido para double)
-        addi $t0, $t0, 1  # i++
+        addi $t0, $t0, 1                # i++ (pula o caractere '-')
+        l.d  $f8, NEG_ONE_DOUBLE        # $f8 = –1.0
 
         _TF_Parte_Inteira_LOOP:
             lb $t1, 0($t0)
-            beq $t1, $zero, _TF_APPLY_SIGN    # detecta o fim da string ($t1 == 0)
+            beq $t1, $zero, _TF_APPLY_SIGN      # detecta o fim da string ($t1 == 0)
             lb $t3, ZERO_CHAR
-            blt $t1, $t3, _TF_CHECK_DOT # if (char < '0') sai do loop
+            slt $at, $t1, $t3
+            bne $at, $zero, _TF_CHECK_DOT       # if (char < '0') sai do loop
             lb $t3, NINE_CHAR
-            bgt $t1, $t3, _TF_CHECK_DOT # if (char > '9') sai do loop
+            slt $at, $t3, $t1
+            bne $at, $zero, _TF_CHECK_DOT       # if (char > '9') sai do loop
 
             # result = result * 10.0
             mul.d $f0, $f0, $f4
 
-            # Converte char para int, depois para double
-            lb $t3, ZERO_CHAR   # Carrega o valor do caractere '0' em $t3
-            sub $t1, $t1, $t3   # Subtrai o valor do registrador $t3
-            mtc1 $t1, $f2
-            cvt.d.w $f2, $f2    # converteu para double
+            # Converte char para int, depois busca o double correspondente na tabela
+            lb $t3, ZERO_CHAR     # Carrega o valor do caractere '0' em $t3
+            sub $t1, $t1, $t3     # Converte o char do dígito para seu valor inteiro (0-9)
+            # Usa o valor do dígito como índice para a tabela 'digit_doubles'
+            sll $t2, $t1, 3       # Calcula o deslocamento: índice * 8 (bytes por double)
+            la $t3, digit_doubles # Carrega o endereço base da tabela de doubles
+            add $t2, $t3, $t2     # Calcula o endereço de digit_doubles[índice]
+            l.d $f2, 0($t2)       # Carrega o valor double do dígito para $f2
 
             # result += (double)digit
-            add.d $f0, $f0, $f2  # Adiciona ao resultado
+            add.d $f0, $f0, $f2   # Adiciona ao resultado
 
             addi $t0, $t0, 1 # i++
-            b _TF_Parte_Inteira_LOOP
+            j _TF_Parte_Inteira_LOOP
 
         _TF_CHECK_DOT:
             lb $t1, 0($t0)    # Recarrega caractere
@@ -563,22 +571,27 @@
             bne $t1, $t3, _TF_APPLY_SIGN # if (char != '.') pula parte decimal
 
             # Processa parte decimal
-            addi $t0, $t0, 1 # i++ (pula o '.')
-            l.d $f6, ONE_TENTH_DOUBLE # parte_decimal = 0.1
+            addi $t0, $t0, 1             # i++ (pula o '.')
+            l.d $f6, ONE_TENTH_DOUBLE    # parte_decimal = 0.1
 
         _TF_Parte_Decimal_LOOP:
             lb $t1, 0($t0)
-            beqz $t1, _TF_APPLY_SIGN     # detecta o fim da string ($t1 == 0)
+            beq $t1, $zero, _TF_APPLY_SIGN      # detecta o fim da string ($t1 == 0)
             lb $t3, ZERO_CHAR
-            blt $t1, $t3, _TF_APPLY_SIGN # if (char < '0') sai do loop
+            slt $at, $t1, $t3
+            bne $at, $zero, _TF_APPLY_SIGN      # if (char < '0') sai do loop
             lb $t3, NINE_CHAR
-            bgt $t1, $t3, _TF_APPLY_SIGN # if (char > '9') sai do loop
+            slt $at, $t3, $t1
+            bne $at, $zero, _TF_APPLY_SIGN      # if (char > '9') sai do loop
 
             # Converte char para int, depois para double
-            lb $t3, ZERO_CHAR   # Carrega o valor do caractere '0' em $t3
-            sub $t1, $t1, $t3   # Subtrai o valor do registrador $t3
-            mtc1 $t1, $f2
-            cvt.d.w $f2, $f2
+            lb $t3, ZERO_CHAR     # Carrega o valor do caractere '0' em $t3
+            sub $t1, $t1, $t3     # Converte o char do dígito para seu valor inteiro (0-9)
+            # Agora, usa esse valor inteiro como um índice para buscar o double na tabela
+            sll $t2, $t1, 3       # Calcula o deslocamento na tabela (índice * 8 bytes)
+            la $t3, digit_doubles # Carrega o endereço base da tabela 'digit_doubles'
+            add $t2, $t3, $t2     # Calcula o endereço final do elemento: base + deslocamento
+            l.d $f2, 0($t2)       # Carrega o valor double do endereço calculado para $f2
 
             # result += (double)digit * parte_decimal
             mul.d $f2, $f2, $f6
@@ -588,10 +601,10 @@
             div.d $f6, $f6, $f4
 
             addi $t0, $t0, 1 # i++
-            b _TF_Parte_Decimal_LOOP
+            j _TF_Parte_Decimal_LOOP
 
         _TF_APPLY_SIGN:
-            mul.d $f0, $f0, $f8 # result = result * sinal
+            mul.d $f0, $f0, $f8  # result = result * sinal
         jr $ra
 
     # FUNÇÃO to_string
