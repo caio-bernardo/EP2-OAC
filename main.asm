@@ -11,6 +11,7 @@
     EOF: .byte -1 # Representa o final de um arquivo
     NULL_CHAR: .byte 0
     SIZE_OF_DOUBLE: .word 8 # Tamanho em bytes de um double
+    temp_double_space: .space 8
 
     # Para função to_float
     ZERO_DOUBLE:       .double 0.0
@@ -106,7 +107,7 @@
                 s.d $f0, ($t0)
 
                 #len++
-                add $s5, $s5, 1
+                addi $s5, $s5, 1
 
             _MAIN_CHECK_BYTE_END_IF:
             # Fim do corpo do Loop #
@@ -135,7 +136,7 @@
     # TODO: abrir arquivo de input no modo de append
     _open_file_output: # abre arquivo e guardar seu descriptor
         la $a0, output_filename
-        li $a1, 9 # Write-only
+        li $a1, 9 # Modo de append
         li $v0, 13
         syscall
         move $s7, $v0 # Armazena descriptor em $s7
@@ -317,7 +318,7 @@
 
         _BUBBLE_END_FOR_I:
         # --- restaura registradores e retorna ---
-        addu $v0, $s0, $zero 
+        addu $v0, $s0, $zero
         lw $ra, 0($sp)
         lw $s0, 4($sp)
         lw $s1, 8($sp)
@@ -456,7 +457,7 @@
     # FUNÇÃO fgetc
     # Implementação própria da fgetc, lê um caracter de um arquivo
     # @param .word ($a0) File descriptor do arquivo a ser lido
-    # @return .byte ($v0) Caracter lido
+    # @return .byte ($v0) Caracter lido, retornar zero se nada foi lido
     fgetc:
         # Lê um caracter do arquivo
         # $a0 ja esta setado
@@ -614,6 +615,252 @@
     # @param .word ($a2): Tamanho do buffer passado
     # @return .word ($v0): O tamanho da string
     to_string:
-        #TODO: implementar
-        move $v0, $zero
+
+        #Variáveis iniciais
+        move $t0, $zero #posição
+        mov.d $f0, $f12 #número double
+        l.d $f2, ZERO_DOUBLE #carregando $f2 com o valor 0.0
+
+        c.lt.d $f2, $f0 #Verificando se o número é positivo
+        bc1t _numPositivo
+
+        #Se o double for negativo, colocaremos na próxima posição da string passada
+        #como argumento o char '-' e, depois, deixaremos positivo o número
+
+        lb $t2, MINUS_CHAR #Carregando registrador com '-'
+        add $t8, $a1, $t0  # Calcula o endereço final em $t8 ($a1 + $t0)
+    	sb  $t2, 0($t8)      # Salva o byte no endereço calculado (aqui a fonte é $t2)
+        addi $t0, $t0, 1 #Incrementando a posição
+
+        neg.d $f0, $f0 #Inverte o sinal do double em $f0
+
+        _numPositivo:
+
+        move $t1, $zero #Posição de float
+        l.d $f2, TEN_DOUBLE #Definindo o valor de $f2 como sendo 10
+
+        #Primeiro while, para ir dividindo por 10 (avançar com a vírgula pelo número) e,
+        #ao mesmo tempo, computar o número de posições de float
+        primeiroWhile:
+
+        	c.lt.d $f0, $f2 #Verificando se o número double é menor do que 10.0
+        	bc1t saidaPrimeiroWhile
+
+        	div.d  $f0, $f0, $f2 #Dividindo o valor atual do número por 10
+        	addi $t1, $t1, 1 #Incrementando a posição de float
+
+        	j primeiroWhile
+
+        saidaPrimeiroWhile:
+
+        #Obtendo a posição do ponto
+        addi $t1, $t1, 1
+        add $t1, $t1, $t0 #Agora, $t1 diz respeito à posição do ponto
+
+        #Atribuir o char '.' em sua devida posição
+        lb $t2, DOT_CHAR #Atribuindo a $t2 o '.'
+        add $t8, $a1, $t1  # Calcula o endereço final em $t8 ($a1 + $t1)
+	sb  $t2, 0($t8)      # Salva o byte no endereço calculado
+
+        #Atribuindo a $t2 o tamanho da string subtraído por 2
+        move $t2, $a2
+        subi $t2, $t2, 2
+
+        l.d $f2, ZERO_DOUBLE
+
+        segundoWhile:
+
+        	c.eq.d $f0, $f2 #Verificando se o número é igual a zero
+        	bc1t saidaSegundoWhile
+        	bgt $t0, $t2, saidaSegundoWhile #Verificando se a posição é maior do que $t2
+
+        	#Pegar a parte inteira do número double
+
+        	# Etapa 1: Mover os bits do double ($f0) para registradores de inteiro.
+        	#Carregando o double de 64 bits na forma de duas palavras separadas de 32 bits
+        	s.d $f0, temp_double_space # Salva o double da FPU para a memória
+        	lw $s1, temp_double_space # Carrega a palavra alta (sinal, expoente, mantissa_alta)
+        	lw $s2, temp_double_space + 4 # Carrega a palavra baixa (mantissa_baixa)
+
+        	# Etapa 2: Isolando o expoente
+        	#O expoente está nos bits 20-30 da $s1
+        	srl $t3, $s1, 20
+        	andi $t3, $t3, 0x7FF # Isola os 11 bits do expoente
+        	addi $s3, $t3, -1023 # Remove o bias para obter o expoente real ($s3)
+
+        	# Etapa 3: Tratar os casos com base no expoente.
+		# A parte inteira ($s4) depende da magnitude do número.
+
+        	bltz $s3, _caso_menor_que_um     # Se expoente < 0, o número é < 1.0.
+		bgt $s3, 20, _caso_grande_demais # Se expoente > 20, a parte inteira pode usar a mantissa baixa.
+
+		# CASO NORMAL: 0 <= expoente <= 20
+		# A parte inteira está contida apenas na mantissa alta.
+		andi $t4, $s1, 0xFFFFF # Pega os 20 bits da mantissa alta
+		ori $t4, $t4, 0x100000 # Adiciona o '1' implícito (total de 21 bits)
+		li $t5, 20
+		subu $t5, $t5, $s3 # Calcula o quanto precisamos deslocar para a direita
+		srlv $s4, $t4, $t5 # Desloca para obter a parte inteira em $s4
+        	j _fim_da_extracao
+
+        	_caso_menor_que_um:
+        		# Se o expoente é negativo, a parte inteira é sempre 0.
+        		li $s4, 0
+        		j _fim_da_extracao
+
+        	_caso_grande_demais:
+        		# Se o expoente é > 20, a parte inteira usa bits da mantissa alta E da baixa.
+        		# (Limitado a expoentes até 51, pois um maior estouraria um inteiro de 32 bits)
+        		andi $t4, $s1, 0xFFFFF # Mantissa alta (20 bits)
+        		ori $t4, $t4, 0x100000 # Adiciona o '1' implícito (21 bits)
+
+        		# Vamos mover os bits da mantissa alta para a esquerda e abrir espaço
+        		# para os bits da mantissa baixa.
+        		subu $t5, $s3, 20 # Quanto precisamos da mantissa baixa = exp - 20
+        		sllv $t6, $t4, $t5 # Desloca a mantissa alta para a esquerda
+
+        		# Agora, pegamos os bits que precisamos da mantissa baixa
+        		li $t7, 32
+        		subu $t5, $t7, $t5 #Calcula o deslocamento para a direita da mantissa baixa
+        		srlv $t7, $s2, $t5
+
+        		or $s4, $t6, $t7 # Combina as duas partes para formar o inteiro final em $s4
+
+		_fim_da_extracao:
+
+
+        	bne $t1, $t0, diferentePosDot #Verificando se a posição ($t0) é diferente da posição do ponto ($t1)
+
+        		#Se for igual, vamos incrementar a posição
+        		addi $t0, $t0, 1
+
+        	diferentePosDot: #Se for diferente, pulamos para cá
+
+        	#Vamos atribuir na posição correta a parte inteira incrementada com o char '0'
+        	lb $t6, ZERO_CHAR
+        	add $t6, $s4, $t6 #Valor a ser atribuído
+
+        	#Salva o byte e DEPOIS incrementa a posição
+        	add $t8, $a1, $t0  # Calcula o endereço final em $t8 ($a1 + $t0)
+            sb  $t6, 0($t8)    # Salva o byte no endereço calculado
+        	addi $t0, $t0, 1 #Incrementando
+
+        	#Salvar o estado atual dos registradores que serão usados para converter de int para double
+        	subu $sp, $sp, 32
+
+		sw $t0, 0($sp)
+		sw $t1, 4($sp)
+		sw $t2, 8($sp)
+		sw $t3, 12($sp)
+		sw $t4, 16($sp)
+		sw $s4, 20($sp)
+		sw $s5, 24($sp)
+		sw $s6, 28($sp)
+
+		lw $s4, 20($sp) # Recarrega o valor original de $s4 para ser convertido.
+
+        	#Converter a parte inteira ($s4) para double para a subtração
+
+        	#Lidar com o caso especial do inteiro ser 0.
+        	beq $s4, $zero, _conv_int_zero
+
+        	#Tratar o sinal.
+        	li $s5, 0 # $s5 guardará a palavra alta do double.
+        	bltz $s4, _conv_int_negativo
+        	# Se for positivo, o bit de sinal já é 0.
+        	j _conv_int_find_msb
+
+        	_conv_int_negativo:
+        		li $s5, 0x80000000 # Coloca '1' no bit de sinal da palavra alta.
+        		negu $s4, $s4 #Nega o inteiro para trabalhar com o valor absoluto.
+        	_conv_int_find_msb:
+        		#Encontrar a posição do bit mais significativo (MSB).
+        		# Isso nos dará o expoente real.
+        		li $t0, 31 # Começa a procurar do bit 31.
+        		li $t1, 1
+        	_conv_int_msb_loop:
+        		sllv $t2, $t1, $t0 # Cria uma máscara para o bit na posição $t0.
+        		and $t3, $s4, $t2
+        		bne $t3, $zero, _conv_int_msb_found # Se o resultado não for zero, achamos o MSB.
+        		subi $t0, $t0, 1
+        		bnez $t0, _conv_int_msb_loop
+        		# Se $t0 chegar a zero e não achou, algo está errado (só para int=0, já tratado).
+        		j _conv_int_msb_found
+
+		_conv_int_msb_found:
+			# $t0 agora contém a posição do MSB (0-31), que é o expoente real.
+			#Calcular o expoente a ser armazenado (com bias).
+			addi $t1, $t0, 1023 # Expoente + bias.
+			sll $t1, $t1, 20 # Desloca o expoente para sua posição na palavra alta.
+			or $s5, $s5, $t1 # Combina com o bit de sinal.
+
+			#Calcular a mantissa.
+			#Remove o MSB do nosso inteiro para ficar apenas com os bits da mantissa.
+			li $t1, 1
+			sllv $t2, $t1, $t0
+			subu $t3, $s4, $t2 # $t3 agora tem os bits da mantissa.
+
+			# Agora, precisamos alinhar esses bits no campo de 52 bits da mantissa.
+			# A mantissa ocupa os 20 bits inferiores da palavra alta e toda a palavra baixa.
+			li $t1, 20
+			subu $t2, $t0, $t1 # $t2 = quanto precisamos deslocar (pode ser negativo).
+
+			li $s6, 0 # $s6 guardará a palavra baixa do double.
+			bgtz $t2, _conv_mantissa_shift_right #Se $t0 > 20, shift right.
+
+
+			#Se $t0 <= 20, shift left.
+			negu $t2, $t2 #Inverte para $t2 ser a quantidade de shift left.
+			sllv $t4, $t3, $t2
+			or $s5, $s5, $t4 # Adiciona a mantissa à palavra alta.
+			j _conv_int_assemble
+
+		_conv_mantissa_shift_right:
+			# A mantissa é grande demais para caber só nos 20 bits da palavra alta.
+			srlv $t4, $t3, $t2
+			or $s5, $s5, $t4 # Parte da mantissa vai para a palavra alta.
+
+			sllv $t4, $t3, $t2 # Pega os bits restantes
+			srlv $t4, $t4, $t2
+			sllv $s6, $t4, $t2
+			sll $s6, $s6, 12 # Alinha na palavra baixa.
+
+		_conv_int_assemble:
+			#Juntar as partes e carregar no registrador de float.
+
+			sw $s6, temp_double_space + 4 #Salva a palavra baixa.
+			l.d $f2, temp_double_space #Carrega o double montado para $f2.
+			j _conv_int_fim
+
+		_conv_int_zero:
+			# Se o inteiro for 0, o double é 0.0.
+			l.d $f2, ZERO_DOUBLE # Supondo que ZERO_DOUBLE (0.0) já foi definido.
+
+		_conv_int_fim:
+
+		#Restaurar os registradores para seus valores originais de antes do bloco.
+		lw $t0, 0($sp)
+		lw $t1, 4($sp)
+		lw $t2, 8($sp)
+		lw $t3, 12($sp)
+		lw $t4, 16($sp)
+		lw $s4, 20($sp)
+		lw $s5, 24($sp)
+		lw $s6, 28($sp)
+		addu $sp, $sp, 32 # Libera o espaço da pilha.
+
+        	#Atualizando o número para a próxima iteração
+        	sub.d $f0, $f0, $f2 #Decrementando o número double pela parte inteira
+        	l.d $f2, TEN_DOUBLE
+        	mul.d $f0, $f0, $f2
+
+        	j segundoWhile
+
+        saidaSegundoWhile:
+
+        	lb $t6, NULL_CHAR
+        	add $t8, $a1, $t0
+        	sb $t6, 0($t8)
+
+ 	move $v0, $t0
         jr $ra
