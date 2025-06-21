@@ -767,23 +767,21 @@
           		or $s4, $t6, $t7 # Combina as duas partes para formar o inteiro final em $s4
 
     		_fim_da_extracao:
-
-
-           	bne $t1, $t0, diferentePosDot #Verificando se a posição ($t0) é diferente da posição do ponto ($t1)
+               	bne $t1, $t0, diferentePosDot #Verificando se a posição ($t0) é diferente da posição do ponto ($t1)
 
           		#Se for igual, vamos incrementar a posição
           		addi $t0, $t0, 1
 
-           	diferentePosDot: #Se for diferente, pulamos para cá
+               	diferentePosDot: #Se for diferente, pulamos para cá
 
-           	#Vamos atribuir na posição correta a parte inteira incrementada com o char '0'
-           	lb $t6, ZERO_CHAR
-           	add $t6, $s4, $t6 #Valor a ser atribuído
+               	#Vamos atribuir na posição correta a parte inteira incrementada com o char '0'
+               	lb $t6, ZERO_CHAR
+               	add $t6, $s4, $t6 #Valor a ser atribuído
 
-           	#Salva o byte e DEPOIS incrementa a posição
-           	add $t8, $a1, $t0  # Calcula o endereço final em $t8 ($a1 + $t0)
+               	#Salva o byte e DEPOIS incrementa a posição
+               	add $t8, $a1, $t0  # Calcula o endereço final em $t8 ($a1 + $t0)
                 sb  $t6, 0($t8)    # Salva o byte no endereço calculado
-           	addi $t0, $t0, 1 #Incrementando
+               	addi $t0, $t0, 1 #Incrementando
 
            	#Salvar o estado atual dos registradores que serão usados para converter de int para double
            	subu $sp, $sp, 32
