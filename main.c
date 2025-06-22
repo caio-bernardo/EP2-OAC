@@ -6,10 +6,11 @@ double to_float(const char *string);
 int to_string(double, char *const, int);
 int count_lines(FILE *f);
 
+const char* file = "numbers2.txt";
 
 int main(void) {
     // abra o arquivo numbers.txt
-    FILE * numbers = fopen("numbers.txt", "r");
+    FILE * numbers = fopen(file, "r");
 
     // Descobre quantos elementos o arquivo possui
     int capacity = count_lines(numbers) + 1;
@@ -39,8 +40,8 @@ int main(void) {
 
     // Escreve o resultado
     // TODO: substituir pelo arquivo de input no modo de append
-    // FILE * output = fopen("numbers.txt", "a");
-    FILE * output = fopen("output.txt", "w");
+    // FILE * output = fopen("output.txt", "w");
+    FILE * output = fopen(file, "a");
     for (int i = 0; i < len; i++) {
         // Converte para string
         to_string(array_ord[i], buffer, 512);
