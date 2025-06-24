@@ -745,8 +745,10 @@
 
 		# ---- Início da conversão int->double OTIMIZADA ----
 		# (double)parte_inteira
-		mtc1 $s4, $f4
-		cvt.d.w $f4, $f4
+		la $t8, digit_doubles # Carrega o endereço base da tabela
+		sll $t9, $s4, 3             # Calcula o offset (dígito * 8 bytes)
+		add $t8, $t8, $t9           # Calcula o endereço do double na tabela
+		l.d $f4, 0($t8)             # Carrega o double (0.0 a 9.0) em $f2
 		# ---- Fim da conversão int->double OTIMIZADA ----
 
 		# Atualiza o número para a próxima iteração
