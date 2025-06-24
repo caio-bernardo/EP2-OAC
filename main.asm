@@ -1,20 +1,4 @@
 .data
-    input_filename: .asciiz "numbers2.txt"
-    output_filename: .asciiz "output.txt"
-
-    buffer: .space 512 # array de bytes; tamanho: 512a
-    .align 2
-    buffer_pos: .word 0 # tamanho sendo utilizado no buffer
-    bytebuf: .space 1 # buffer de 1 byte
-
-    LINEBREAK: .byte 10 # caracter \n
-    ZERO_CHAR: .byte '0'
-    EOF: .byte -1 # Representa o final de um arquivo
-    NULL_CHAR: .byte 0
-    .align 2
-    SIZE_OF_DOUBLE: .word 8 # Tamanho em bytes de um double
-    temp_double_space: .space 8
-
     .align 3
     # Para função to_float
     ZERO_DOUBLE:       .double 0.0
@@ -26,7 +10,31 @@
     MINUS_CHAR:        .byte '-'
     .align 3
     NEG_ONE_DOUBLE:    .double -1.0
+    .align 3
     digit_doubles:     .double 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0
+    .align 3
+    temp_double_space: .space 8
+
+    .align 2
+    buffer_pos: .word 0 # tamanho sendo utilizado no buffer
+
+    .align 2
+    SIZE_OF_DOUBLE: .word 8 # Tamanho em bytes de um double
+
+    input_filename: .asciiz "numbers2.txt"
+    output_filename: .asciiz "output.txt"
+
+    buffer: .space 512 # array de bytes; tamanho: 512a
+
+    bytebuf: .space 1 # buffer de 1 byte
+
+    LINEBREAK: .byte 10 # caracter \n
+    ZERO_CHAR: .byte '0'
+    EOF: .byte -1 # Representa o final de um arquivo
+    NULL_CHAR: .byte 0
+
+
+
 
     .align 2
     BUBBLE_SORT:       .word 0
@@ -643,7 +651,7 @@
         _TF_APPLY_SIGN:
             mul.d $f0, $f0, $f8  # result = result * sinal
         jr $ra
-    
+
     # FUNÇÃO to_string
     # Converte um double para uma string, armazenando na string passada como parametro
     # @param .double ($f12): Double a ser convertido
@@ -651,7 +659,6 @@
     # @param .word ($a2): Tamanho do buffer passado
     # @return .word ($v0): O tamanho da string
     to_string_mtc:
-        
 	addi $sp, $sp, -24
 	sw $s5, 20($sp)
         sw $s0, 16($sp)
@@ -716,29 +723,18 @@
         segundoWhile:
 		c.eq.d $f0, $f2         # if (num == 0.0)
 		bc1t saidaSegundoWhile  #   goto saida
-		
 		bgt $t0, $t2, saidaSegundoWhile # if (pos > string_size - 2)
-		
+
 		# ---- Início da extração da parte inteira (dígito) ----
-		s.d $f0, temp_double_space
-		lw $s1, temp_double_space
-		srl $s3, $s1, 20
-		andi $s3, $s3, 0x7FF
-		addi $s3, $s3, -1023
-		
-		# Como num está entre 0 e 10, o expoente será 0, 1, 2 ou 3.
-		# A lógica simplificada para extrair o dígito é suficiente.
-		andi $t4, $s1, 0xFFFFF
-		ori $t4, $t4, 0x100000
-		li $t5, 20
-		subu $t5, $t5, $s3
-		srlv $s4, $t4, $t5      # $s4 contém o dígito (0-9)
+		# parte_inteira = trunc(num)
+		trunc.w.d $f4, $f0
+		mfc1 $s4, $f4
 		# ---- Fim da extração da parte inteira (dígito) ----
 
 		# Pula o ponto se a posição atual for a do ponto
 		bne $t1, $t0, diferentePosDot
 		addi $t0, $t0, 1
-		
+
 		diferentePosDot:
 		# Converte o dígito para char e armazena
 		lb $t8, ZERO_CHAR
@@ -746,20 +742,18 @@
 		add $t9, $t0, $a1
 		sb $t8, 0($t9)       # string[pos] = ...
 		addi $t0, $t0, 1        # pos++
-		
+
 		# ---- Início da conversão int->double OTIMIZADA ----
-		# Converte a parte inteira ($s4) para double para a subtração
-		la $t8, digit_doubles # Carrega o endereço base da tabela
-		sll $t9, $s4, 3             # Calcula o offset (dígito * 8 bytes)
-		add $t8, $t8, $t9           # Calcula o endereço do double na tabela
-		l.d $f2, 0($t8)             # Carrega o double (0.0 a 9.0) em $f2
+		# (double)parte_inteira
+		mtc1 $s4, $f4
+		cvt.d.w $f4, $f4
 		# ---- Fim da conversão int->double OTIMIZADA ----
-		
+
 		# Atualiza o número para a próxima iteração
-		sub.d $f0, $f0, $f2         # num -= parte_inteira
-		l.d $f2, TEN_DOUBLE
-		mul.d $f0, $f0, $f2         # num *= 10.0
-		
+		sub.d $f0, $f0, $f4         # num -= parte_inteira
+		l.d $f4, TEN_DOUBLE
+		mul.d $f0, $f0, $f4         # num *= 10.0
+
 		j segundoWhile
 
         saidaSegundoWhile:
@@ -769,6 +763,7 @@
         	sb $t6, 0($t8)
         	move $v0, $t0
 
+
         lw $s4, 0($sp)
         lw $s3, 4($sp)
         lw $s2, 8($sp)
@@ -776,6 +771,5 @@
         lw $s0, 16($sp)
         lw $s5, 20($sp)
         addi $sp, $sp, 24
-       	
+
         jr $ra
-    

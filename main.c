@@ -188,8 +188,9 @@ int to_string(double number, char *const string, int string_size) {
         if (pos == dot_position) {
             pos++;
         }
-        string[pos++] = parte_inteira + '0';
 
+        int parte_inteira = (int)num;
+        string[pos++] = parte_inteira + '0';
         num -= (double)parte_inteira;
         num *= 10.0;
     }
