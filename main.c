@@ -183,8 +183,6 @@ int to_string(double number, char *const string, int string_size) {
     string[dot_position] = '.';
 
     while (num != 0.0 && pos < string_size - 2) {
-        int parte_inteira = (int)num;
-
         if (pos == dot_position) {
             pos++;
         }
