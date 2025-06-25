@@ -21,8 +21,8 @@
     .align 2
     SIZE_OF_DOUBLE: .word 8 # Tamanho em bytes de um double
 
-    input_filename: .asciiz "numbers2.txt"
-    output_filename: .asciiz "output.txt"
+    input_filename: .asciiz "dadosEP2.txt"
+    output_filename: .asciiz "dadosEP2.txt"
 
     buffer: .space 512 # array de bytes; tamanho: 512a
 
@@ -32,9 +32,6 @@
     ZERO_CHAR: .byte '0'
     EOF: .byte -1 # Representa o final de um arquivo
     NULL_CHAR: .byte 0
-
-
-
 
     .align 2
     BUBBLE_SORT:       .word 0
@@ -165,7 +162,7 @@
     # TODO: abrir arquivo de input no modo de append
     _open_file_output: # abre arquivo e guardar seu descriptor
         la $a0, output_filename # la $a0, input_filename
-        li $a1, 1 # li $a1, 8
+        li $a1, 9 # li $a1, 8
         jal openfile
         blt $v0, $zero, _exit
         move $s7, $v0 # Armazena descriptor em $s7
@@ -181,19 +178,21 @@
             l.d $f12, ($t1)
 
             la $a1, buffer
-            li $a2, 512
-            jal to_string_mtc
+            li $a2, 10
+            jal to_string
+            move $t0, $v0
 
-            # fwrite(buffer, $f0, $s7)
-            move $a0, $s7
-            la $a1, buffer
-            move $a2, $v0
-            li $v0, 15
-            syscall
             # fwrite("\n", 1, $s7)
             move $a0, $s7
             la $a1, LINEBREAK
             li $a2, 1
+            li $v0, 15
+            syscall
+
+            # fwrite(buffer, $f0, $s7)
+            move $a0, $s7
+            la $a1, buffer
+            move $a2, $t0
             li $v0, 15
             syscall
 
@@ -658,9 +657,9 @@
     # @param .word ($a1): Endereço do buffer a ser preenchido
     # @param .word ($a2): Tamanho do buffer passado
     # @return .word ($v0): O tamanho da string
-    to_string_mtc:
-	addi $sp, $sp, -24
-	sw $s5, 20($sp)
+    to_string:
+    	addi $sp, $sp, -24
+    	sw $s5, 20($sp)
         sw $s0, 16($sp)
         sw $s1, 12($sp)
         sw $s2, 8($sp)
@@ -721,50 +720,70 @@
         l.d $f2, ZERO_DOUBLE
 
         segundoWhile:
-		c.eq.d $f0, $f2         # if (num == 0.0)
-		bc1t saidaSegundoWhile  #   goto saida
-		bgt $t0, $t2, saidaSegundoWhile # if (pos > string_size - 2)
+    		c.eq.d $f0, $f2         # if (num == 0.0)
+    		bc1t saidaSegundoWhile  #   goto saida
+    		bgt $t0, $t2, saidaSegundoWhile # if (pos > string_size - 2)
 
-		# ---- Início da extração da parte inteira (dígito) ----
-		# parte_inteira = trunc(num)
-		trunc.w.d $f4, $f0
-		mfc1 $s4, $f4
-		# ---- Fim da extração da parte inteira (dígito) ----
+    		# ---- Início da extração da parte inteira (dígito) ----
+    		l.d $f4, ONE_DOUBLE #Variável de controle para o loop
+    		l.d $f6, ONE_DOUBLE #Valor a ser somado em $f4
+    		move $s4, $zero #Será o nosso valor inteiro pós conversão
 
-		# Pula o ponto se a posição atual for a do ponto
-		bne $t1, $t0, diferentePosDot
-		addi $t0, $t0, 1
+    		loopConverteDoubleInt:
+    			#Se o $f0 for menor do que o $f4, terminamos a conversão
+    			c.le.d $f0, $f4
+    			bc1t fimConversaoDoubleInt
 
-		diferentePosDot:
-		# Converte o dígito para char e armazena
-		lb $t8, ZERO_CHAR
-		add $t8, $s4, $t8
-		add $t9, $t0, $a1
-		sb $t8, 0($t9)       # string[pos] = ...
-		addi $t0, $t0, 1        # pos++
+    			add.d $f4, $f4, $f6 #Incrementando para controle do loop
+    			addi $s4, $s4, 1 #Incrementando para obter a parte inteira
 
-		# ---- Início da conversão int->double OTIMIZADA ----
-		# (double)parte_inteira
-		la $t8, digit_doubles # Carrega o endereço base da tabela
-		sll $t9, $s4, 3             # Calcula o offset (dígito * 8 bytes)
-		add $t8, $t8, $t9           # Calcula o endereço do double na tabela
-		l.d $f4, 0($t8)             # Carrega o double (0.0 a 9.0) em $f2
-		# ---- Fim da conversão int->double OTIMIZADA ----
+    			j loopConverteDoubleInt
+    		fimConversaoDoubleInt:
+    		# ---- Fim da extração da parte inteira (dígito) -> Valor em $s4
 
-		# Atualiza o número para a próxima iteração
-		sub.d $f0, $f0, $f4         # num -= parte_inteira
-		l.d $f4, TEN_DOUBLE
-		mul.d $f0, $f0, $f4         # num *= 10.0
+    		# Pula o ponto se a posição atual for a do ponto
+    		bne $t1, $t0, diferentePosDot
+    		addi $t0, $t0, 1
 
-		j segundoWhile
+    		diferentePosDot:
+    		# Converte o dígito para char e armazena
+    		lb $t8, ZERO_CHAR
+    		add $t8, $s4, $t8
+    		add $t9, $t0, $a1
+    		sb $t8, 0($t9)       # string[pos] = ...
+    		addi $t0, $t0, 1        # pos++
 
+    		# ---- Início da conversão int -> double ----
+    		move $t6, $zero #Variável de controle para o loop
+    		l.d $f4, ZERO_DOUBLE #Será o nosso valor convertido
+    		l.d $f6, ONE_DOUBLE #Valor a ser incrementado em $f4
+
+    		loopConverteIntDouble:
+    			#Se $f7 for maior do que $s4, terminamos a conversão
+    			beq $t6, $s4, fimConversaoIntDouble
+
+    			addi $t6, $t6, 1 #Incrementando a variável de controle $t6
+    			add.d $f4, $f4, $f6 #Incrementando $f4 para obter o double final
+
+    			j loopConverteIntDouble
+    		fimConversaoIntDouble:
+    		# ---- Fim da conversão int->double -> Valor em $f4
+
+    		# Atualiza o número para a próxima iteração
+    		sub.d $f0, $f0, $f4         # num -= parte_inteira
+    		l.d $f4, TEN_DOUBLE
+    		mul.d $f0, $f0, $f4         # num *= 10.0
+
+    		j segundoWhile
         saidaSegundoWhile:
 
-        	lb $t6, NULL_CHAR
-        	add $t8, $a1, $t0
-        	sb $t6, 0($t8)
-        	move $v0, $t0
+		#Atribuição de '\0' na última posição, para finalizar a string
+		lb $t6, NULL_CHAR
+       	add $t8, $a1, $t0
+       	sb $t6, 0($t8)
 
+       	#retorno
+       	move $v0, $t0
 
         lw $s4, 0($sp)
         lw $s3, 4($sp)

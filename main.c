@@ -6,7 +6,7 @@ double to_float(const char *string);
 int to_string(double, char *const, int);
 int count_lines(FILE *f);
 
-const char* file = "numbers2.txt";
+const char* file = "dadosEP2.txt";
 
 int main(void) {
     // abra o arquivo numbers.txt
@@ -46,8 +46,8 @@ int main(void) {
         // Converte para string
         to_string(array_ord[i], buffer, 512);
         // Escreve no arquivo
-        fputs(buffer, output);
         fputc('\n', output);
+        fputs(buffer, output);
     }
 
     // Libera memória e fecha os arquivos
