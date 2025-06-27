@@ -22,8 +22,8 @@
     SIZE_OF_DOUBLE: .word 8
 
     input_filename: .asciiz "dadosEP2.txt"
-    output_filename: .asciiz "dadosEP2.txt"
 
+    # buffer para armazenar uma linha
     buffer: .space 512
 
     bytebuf: .space 1 # buffer de 1 byte
@@ -47,19 +47,17 @@
     # $s4: Novo array de doubles ordenado
     _open_file: # abre arquivo e guardar seu descriptor
         la $a0, input_filename
-        li $a1, 0 # Read-only
+        li $a1, 0
         jal openfile
         blt $v0, $zero, _exit
         move $s7, $v0 # $s7 = file descriptor
 
     _count_file_lines: # conta quantas linhas o arquivo possui, pois qnt de linhas == qnt de numeros
-        # $t7 = count_lines($s7)
         move $a0, $s7
         jal count_lines
         move $t7, $v0
 
         # Coloca o ponteiro do arquivo de volta na posicao inicial
-        # Equivalente a fseek($s7, 0, SEEK_SET)
         move $a0, $s7
         jal closefile
         la $a0, input_filename
@@ -67,11 +65,8 @@
         jal openfile
         blt $v0, $zero, _exit
         move $s7, $v0
-        # qnt de numeros armazenado em $t7
 
     _alloc_array: #aloca espaço para o array de doubles
-       	# Nota de esclarecimento: a memória do heap alocada precisa ser manualmente alinhada para accessar a memória de doubles
-        # Será usada a seguinte formula: (endereço + 7) & -8
 
         # calcula o tamanho do array
         lw $t1, SIZE_OF_DOUBLE
@@ -83,7 +78,6 @@
         syscall
         move $s6, $v0
         li $s5, 0 # Tamanho atual do array. $s5 = 0
-        # NOTA: No MARS não é preciso desalocar a memória alocada no heap
 
     _loop_over_file: # loop sobre os bytes do arquivo
         # char c = fgetc(input_file)
@@ -159,22 +153,19 @@
     move $a0, $s7
     jal closefile
 
-    # TODO: abrir arquivo de input no modo de append
-    _open_file_output: # abre arquivo e guardar seu descriptor
-        la $a0, output_filename # la $a0, input_filename
-        li $a1, 9 # li $a1, 8
+    _open_file_output:
+        la $a0, input_filename
+        li $a1, 9 # append + escrita no final do arquivo
         jal openfile
         blt $v0, $zero, _exit
-        move $s7, $v0 # Armazena descriptor em $s7
+        move $s7, $v0
 
     _loop_over_array: # Itera sobre o array e escreve no arquivo
         move $s0, $zero
         _OVER_ARRAY_FOR_LOOP:
             bge $s0, $s5, _OVER_ARRAY_END_FOR_LOOP
-            # acessa a posição $t0 do array ($s4)
             sll $t1, $s0, 3
             add $t1, $t1, $s4
-            # $v0 = to_string($s4[$t1], buffer, 512)
             l.d $f12, ($t1)
 
             la $a1, buffer
@@ -200,33 +191,26 @@
             b _OVER_ARRAY_FOR_LOOP
         _OVER_ARRAY_END_FOR_LOOP:
 
-    # Fechar o arquivos
     move $a0, $s7
     jal closefile
-    # Encerra o programa com status code 0
     _exit:
         li $v0, 10
         syscall
 
-
-    # ---
-
     # FUNÇÃO ordena
     # Recebe um array de doubles e retorna um novo array ordenado utilize o método de ordenação definido em tipo
-    # @param .word ($a0) vetor: Endereço do vetor de floats
-    # @param .word ($a1) tam: Tamanho do array
-    # @param .word ($a2) tipo: Forma de ordenação à ser usada, 0 para Bubble Sort e 1 para QuickSort
-    # @return .word ($v0) Retorna o vetor de doubles ordenado
+    # $a0: Endereço do vetor de floats
+    # $a1: Tamanho do array
+    # $a2: Forma de ordenação à ser usada, 0 para Bubble Sort e 1 para QuickSort
+    # $v0: Retorna o vetor de doubles ordenado
     ordena:
-        # Salva na pilha os registradores que precisam ser preservados entre chamadas de função.
         addi $sp, $sp, -20
-        sw $ra, 16($sp) # Salva o endereço de retorno
-        sw $s0, 12($sp) # Usaremos para o ponteiro do vetor original
-        sw $s1, 8($sp)  # Usaremos para o tamanho (tam)
-        sw $s2, 4($sp)  # Usaremos para o tipo de ordenação
-        sw $s3, 0($sp)  # Usaremos para o ponteiro do novo vetor
+        sw $ra, 16($sp)
+        sw $s0, 12($sp)
+        sw $s1, 8($sp)
+        sw $s2, 4($sp)
+        sw $s3, 0($sp)
 
-        # Copia os argumentos para registradores salvos, para não os perdermos
         move $s0, $a0 # $s0 = vetor (original)
         move $s1, $a1 # $s1 = tam
         move $s2, $a2 # $s2 = tipo
@@ -250,8 +234,8 @@
             add $t3, $s3, $t1
 
             # Copia o double
-            l.d $f0, 0($t2) # Carrega o valor da fonte
-            s.d $f0, 0($t3) # Armazena o valor no destino
+            l.d $f0, 0($t2)
+            s.d $f0, 0($t3)
 
             addi $t0, $t0, 1 # i++
             j _copy_loop
@@ -286,8 +270,8 @@
 
     # FUNÇÃO bubblesort
     # Realiza uma ordenação bubble sort
-    # @param .word ($a0) vetor: Vetor de double a ser ordenado
-    # @param .word ($a1) tam: Tamanho do vetor
+    # $a0: Vetor de double a ser ordenado
+    # $a1: Tamanho do vetor
     bubblesort:
         # Salvando os registradores que serão usados
         addi $sp, $sp, -20
@@ -356,13 +340,12 @@
 
     # FUNÇÃO quicksort
     # Realiza uma ordenação quick sort
-    # @param .word ($a0) vetor: Vetor de double a ser ordenado
-    # @param .word ($a1) low: Ponto mais baixo do vetor
-    # @param .word ($a2) high: Ponto mais alto do vetor
+    # $a0: Vetor de double a ser ordenado
+    # $a1: Ponto mais baixo do vetor
+    # $a2: Ponto mais alto do vetor
     quicksort:
-        # Aloca espaço no stack para salvar variáveis essenciais.
         addi $sp, $sp, -28
-        sw $ra, 24($sp) # Salva o endereço de retorno
+        sw $ra, 24($sp)
         sw $s0, 20($sp) # Usaremos para o ponteiro do vetor
         sw $s1, 16($sp) # Usaremos para 'low'
         sw $s2, 12($sp) # Usaremos para 'high'
@@ -370,7 +353,6 @@
         sw $s4, 4($sp)  # Usaremos para 'j'
         # Posição 0($sp) será usada para salvar 'high' para a 2ª chamada
 
-        # Copia os argumentos para registradores salvos para não perdê-los
         move $s0, $a0 # $s0 = vetor
         move $s1, $a1 # $s1 = low
         move $s2, $a2 # $s2 = high
@@ -433,8 +415,8 @@
             s.d $f8, 0($t0) # vetor[i] = vetor[j]
             s.d $f6, 0($t1) # vetor[j] = vetor[i]
 
-            addi $s3, $s3, 1  # i++
-            addi $s4, $s4, -1 # j--
+            addi $s3, $s3, 1
+            addi $s4, $s4, -1
 
         _post_swap:
             j _partition_loop
@@ -469,22 +451,21 @@
             jal quicksort
 
         _quicksort_epilogo:
-            # Restaura os registradores da pilha na ordem inversa
             lw $ra, 24($sp)
             lw $s0, 20($sp)
             lw $s1, 16($sp)
             lw $s2, 12($sp)
             lw $s3, 8($sp)
             lw $s4, 4($sp)
-            addi $sp, $sp, 28 # Libera o espaço alocado na pilha
+            addi $sp, $sp, 28
 
             jr $ra
 
 
     # FUNÇÃO openfile
     # Abre o arquivo $a0, no modo $a1 e retorna seu descriptor
-    # @param .word ($a0) nome do arquivo a ser aberto
-    # @param .word ($a1) modo de abertura (ler: 0/escrever: 1)
+    # $a0: nome do arquivo a ser aberto
+    # $a1: modo de abertura
     openfile:
         li $v0, 13
         syscall
@@ -492,7 +473,7 @@
 
     # FUNÇÃO closefile
     # Fecha o arquivo passado como argumento
-    # @param .word ($a0) File descriptor do arquivo a ser fechado
+    # $a0: File descriptor do arquivo a ser fechado
     closefile:
         li $v0, 16
         syscall
@@ -500,8 +481,8 @@
 
     # FUNÇÃO fgetc
     # Implementação própria da fgetc, lê um caracter de um arquivo
-    # @param .word ($a0) File descriptor do arquivo a ser lido
-    # @return .byte ($v0) Caracter lido, retornar EOF (-1) se nada foi lido
+    # $a0: File descriptor do arquivo a ser lido
+    # $v0: Caracter lido, retornar EOF (-1) se nada foi lido
     fgetc:
         # Lê um caracter do arquivo
         # $a0 ja esta setado
@@ -606,8 +587,8 @@
             bne $t1, $t3, _TF_Aplica_Sinal # if (char != '.') pula parte decimal
 
             # Processa parte decimal
-            addi $t0, $t0, 1            # i++ (pula o '.')
-            l.d $f6, ONE_TENTH_DOUBLE    # parte_decimal = 0.1
+            addi $t0, $t0, 1
+            l.d $f6, ONE_TENTH_DOUBLE
 
         _TF_Parte_Decimal_LOOP:
             lb $t1, 0($t0)
@@ -620,35 +601,33 @@
             bne $t4, $zero, _TF_Aplica_Sinal     # Se (char > '9') sai do loop
 
             # Converte char para int, depois para double
-            lb $t3, ZERO_CHAR             # '0' em $t3
-            sub $t1, $t1, $t3              # Converte o char do dígito para seu valor inteiro (0-9)
+            lb $t3, ZERO_CHAR
+            sub $t1, $t1, $t3
 
             # Agora, usa esse valor inteiro como um índice para buscar o double na tabela
-            sll $t2, $t1, 3             # Calcula o deslocamento na tabela
-            la $t3, digit_doubles       # Carrega o endereço base da tabela 'digit_doubles'
-            add $t2, $t3, $t2          # Calcula o endereço final do elemento
-            l.d $f2, 0($t2)             # Coloca o valor double do endereço calculado para $f2
+            sll $t2, $t1, 3
+            la $t3, digit_doubles
+            add $t2, $t3, $t2
+            l.d $f2, 0($t2)
 
-                # result += (double)digit * parte_decimal
             mul.d $f2, $f2, $f6
             add.d $f0, $f0, $f2
 
-            # parte_decimal *= 0.1 (ou parte_decimal /= 10.0)
             div.d $f6, $f6, $f4
 
-            addi $t0, $t0, 1 # i++
+            addi $t0, $t0, 1
             j _TF_Parte_Decimal_LOOP
 
         _TF_Aplica_Sinal:
-            mul.d $f0, $f0, $f8  # result = result * sinal
+            mul.d $f0, $f0, $f8
         jr $ra
 
     # FUNÇÃO to_string
     # Converte um double para uma string, armazenando na string passada como parametro
-    # @param .double ($f12): Double a ser convertido
-    # @param .word ($a1): Endereço do buffer a ser preenchido
-    # @param .word ($a2): Tamanho do buffer passado
-    # @return .word ($v0): O tamanho da string
+    # $f12: Double a ser convertido
+    # $a1: Endereço do buffer a ser preenchido
+    # $a2: Tamanho do buffer passado
+    # $v0: O tamanho da string
     to_string:
     	addi $sp, $sp, -24
     	sw $s5, 20($sp)
@@ -658,80 +637,74 @@
         sw $s3, 4($sp)
         sw $s4, 0($sp)
 
-        #Variáveis iniciais
-        move $t0, $zero #posição
-        mov.d $f0, $f12 #número double
-        l.d $f2, ZERO_DOUBLE #carregando $f2 com o valor 0.0
+        move $t0, $zero
+        mov.d $f0, $f12
+        l.d $f2, ZERO_DOUBLE
 
-        c.lt.d $f2, $f0 #Verificando se o número é positivo
+        c.lt.d $f2, $f0
         bc1t _numPositivo
 
         #Se o double for negativo, colocaremos na próxima posição da string passada
         #como argumento o char '-' e, depois, deixaremos positivo o número
+        lb $t2, MINUS_CHAR
+        add $t8, $a1, $t0
+    	sb  $t2, 0($t8)
+        addi $t0, $t0, 1
 
-        lb $t2, MINUS_CHAR #Carregando registrador com '-'
-        add $t8, $a1, $t0  # Calcula o endereço final em $t8 ($a1 + $t0)
-    	sb  $t2, 0($t8)      # Salva o byte no endereço calculado (aqui a fonte é $t2)
-        addi $t0, $t0, 1 #Incrementando a posição
-
-        neg.d $f0, $f0 #Inverte o sinal do double em $f0
+        neg.d $f0, $f0
 
         _numPositivo:
 
-        move $t1, $zero #Posição de float
-        l.d $f2, TEN_DOUBLE #Definindo o valor de $f2 como sendo 10
+        move $t1, $zero
+        l.d $f2, TEN_DOUBLE
 
         #Primeiro while, para ir dividindo por 10 (avançar com a vírgula pelo número) e,
         #ao mesmo tempo, computar o número de posições de float
         primeiroWhile:
 
-        	c.lt.d $f0, $f2 #Verificando se o número double é menor do que 10.0
+        	c.lt.d $f0, $f2
         	bc1t saidaPrimeiroWhile
 
-        	div.d  $f0, $f0, $f2 #Dividindo o valor atual do número por 10
-        	addi $t1, $t1, 1 #Incrementando a posição de float
+        	div.d  $f0, $f0, $f2
+        	addi $t1, $t1, 1
 
         	j primeiroWhile
 
         saidaPrimeiroWhile:
 
 
-        #Obtendo a posição do ponto
         addi $t1, $t1, 1
-        add $t1, $t1, $t0 #Agora, $t1 diz respeito à posição do ponto
+        add $t1, $t1, $t0
 
         #Atribuir o char '.' em sua devida posição
-        lb $t2, DOT_CHAR #Atribuindo a $t2 o '.'
-        add $t8, $a1, $t1  # Calcula o endereço final em $t8 ($a1 + $t1)
-    	sb  $t2, 0($t8)      # Salva o byte no endereço calculado
+        lb $t2, DOT_CHAR
+        add $t8, $a1, $t1
+    	sb  $t2, 0($t8)
 
-        #Atribuindo a $t2 o tamanho da string subtraído por 2
+        #Atribuindo a $t2 o tamanho da string subtraído por 2 que representa os caracteres de sinal e de ponto flutuante
         move $t2, $a2
         subi $t2, $t2, 2
 
         l.d $f2, ZERO_DOUBLE
 
         segundoWhile:
-    		c.eq.d $f0, $f2         # if (num == 0.0)
-    		bc1t saidaSegundoWhile  #   goto saida
-    		bgt $t0, $t2, saidaSegundoWhile # if (pos > string_size - 2)
+    		c.eq.d $f0, $f2
+    		bc1t saidaSegundoWhile
+    		bgt $t0, $t2, saidaSegundoWhile
 
-    		# ---- Início da extração da parte inteira (dígito) ----
-    		l.d $f4, ONE_DOUBLE #Variável de controle para o loop
-    		l.d $f6, ONE_DOUBLE #Valor a ser somado em $f4
-    		move $s4, $zero #Será o nosso valor inteiro pós conversão
+    		l.d $f4, ONE_DOUBLE
+    		l.d $f6, ONE_DOUBLE
+    		move $s4, $zero
 
     		loopConverteDoubleInt:
-    			#Se o $f0 for menor do que o $f4, terminamos a conversão
     			c.le.d $f0, $f4
     			bc1t fimConversaoDoubleInt
 
-    			add.d $f4, $f4, $f6 #Incrementando para controle do loop
-    			addi $s4, $s4, 1 #Incrementando para obter a parte inteira
+    			add.d $f4, $f4, $f6
+    			addi $s4, $s4, 1
 
     			j loopConverteDoubleInt
     		fimConversaoDoubleInt:
-    		# ---- Fim da extração da parte inteira (dígito) -> Valor em $s4
 
     		# Pula o ponto se a posição atual for a do ponto
     		bne $t1, $t0, diferentePosDot
@@ -742,29 +715,25 @@
     		lb $t8, ZERO_CHAR
     		add $t8, $s4, $t8
     		add $t9, $t0, $a1
-    		sb $t8, 0($t9)       # string[pos] = ...
-    		addi $t0, $t0, 1        # pos++
+    		sb $t8, 0($t9)
+    		addi $t0, $t0, 1
 
-    		# ---- Início da conversão int -> double ----
-    		move $t6, $zero #Variável de controle para o loop
-    		l.d $f4, ZERO_DOUBLE #Será o nosso valor convertido
-    		l.d $f6, ONE_DOUBLE #Valor a ser incrementado em $f4
+    		move $t6, $zero
+    		l.d $f4, ZERO_DOUBLE
+    		l.d $f6, ONE_DOUBLE
 
     		loopConverteIntDouble:
-    			#Se $f7 for maior do que $s4, terminamos a conversão
     			beq $t6, $s4, fimConversaoIntDouble
 
-    			addi $t6, $t6, 1 #Incrementando a variável de controle $t6
-    			add.d $f4, $f4, $f6 #Incrementando $f4 para obter o double final
+    			addi $t6, $t6, 1
+    			add.d $f4, $f4, $f6
 
     			j loopConverteIntDouble
     		fimConversaoIntDouble:
-    		# ---- Fim da conversão int->double -> Valor em $f4
 
-    		# Atualiza o número para a próxima iteração
-    		sub.d $f0, $f0, $f4         # num -= parte_inteira
+    		sub.d $f0, $f0, $f4
     		l.d $f4, TEN_DOUBLE
-    		mul.d $f0, $f0, $f4         # num *= 10.0
+    		mul.d $f0, $f0, $f4
 
     		j segundoWhile
         saidaSegundoWhile:
@@ -774,7 +743,6 @@
        	add $t8, $a1, $t0
        	sb $t6, 0($t8)
 
-       	#retorno
        	move $v0, $t0
 
         lw $s4, 0($sp)
