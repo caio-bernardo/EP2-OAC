@@ -144,8 +144,8 @@
     # $s4 = ordena($s6, $s5, BubbleSort)
     move $a0, $s6
     move $a1, $s5
-    # lw $a2, QUICK_SORT
-    lw $a2, BUBBLE_SORT
+    lw $a2, QUICK_SORT
+    # lw $a2, BUBBLE_SORT
     jal ordena
     move $s4, $v0
 
@@ -244,7 +244,6 @@
         # Se tipo == 0, chama o bubblesort
         beq $s2, $zero, _ordena_bubblesort
 
-        # TODO: alocar novo array e copiar os valores de vetor para esse novo array
         _ordena_quicksort:
             move $a0, $s3     # 1º arg: novo vetor
             li $a1, 0         # 2º arg: low = 0
@@ -426,10 +425,6 @@
             slt $t0, $s1, $s4 # $t0 = 1 se low < j
             beq $t0, $zero, _call_second # Se não, pula para a segunda chamada
 
-            # Salva os argumentos da segunda chamada (i, high) na pilha
-            sw $s3, 8($sp) # Reutilizando o espaço de $s3 para salvar 'i'
-            sw $s2, 0($sp) # Salva 'high' original
-
             move $a0, $s0 # 1º arg: vetor
             move $a1, $s1 # 2º arg: low
             move $a2, $s4 # 3º arg: j
@@ -437,9 +432,6 @@
 
         _call_second:
             # Segunda chamada recursiva: quicksort(vetor, i, high)
-            # Restaura os argumentos salvos
-            lw $s3, 8($sp) # Recupera 'i'
-            lw $s2, 0($sp) # Recupera 'high' original
 
             # if (i < high)
             slt $t0, $s3, $s2 # $t0 = 1 se i < high
@@ -629,8 +621,8 @@
     # $a2: Tamanho do buffer passado
     # $v0: O tamanho da string
     to_string:
-    	addi $sp, $sp, -24
-    	sw $s5, 20($sp)
+        addi $sp, $sp, -24
+        sw $s5, 20($sp)
         sw $s0, 16($sp)
         sw $s1, 12($sp)
         sw $s2, 8($sp)
@@ -648,7 +640,7 @@
         #como argumento o char '-' e, depois, deixaremos positivo o número
         lb $t2, MINUS_CHAR
         add $t8, $a1, $t0
-    	sb  $t2, 0($t8)
+        sb  $t2, 0($t8)
         addi $t0, $t0, 1
 
         neg.d $f0, $f0
@@ -662,13 +654,13 @@
         #ao mesmo tempo, computar o número de posições de float
         primeiroWhile:
 
-        	c.lt.d $f0, $f2
-        	bc1t saidaPrimeiroWhile
+            c.lt.d $f0, $f2
+            bc1t saidaPrimeiroWhile
 
-        	div.d  $f0, $f0, $f2
-        	addi $t1, $t1, 1
+            div.d  $f0, $f0, $f2
+            addi $t1, $t1, 1
 
-        	j primeiroWhile
+            j primeiroWhile
 
         saidaPrimeiroWhile:
 
@@ -679,7 +671,7 @@
         #Atribuir o char '.' em sua devida posição
         lb $t2, DOT_CHAR
         add $t8, $a1, $t1
-    	sb  $t2, 0($t8)
+        sb  $t2, 0($t8)
 
         #Atribuindo a $t2 o tamanho da string subtraído por 2 que representa os caracteres de sinal e de ponto flutuante
         move $t2, $a2
@@ -688,62 +680,62 @@
         l.d $f2, ZERO_DOUBLE
 
         segundoWhile:
-    		c.eq.d $f0, $f2
-    		bc1t saidaSegundoWhile
-    		bgt $t0, $t2, saidaSegundoWhile
+            c.eq.d $f0, $f2
+            bc1t saidaSegundoWhile
+            bgt $t0, $t2, saidaSegundoWhile
 
-    		l.d $f4, ONE_DOUBLE
-    		l.d $f6, ONE_DOUBLE
-    		move $s4, $zero
+            l.d $f4, ONE_DOUBLE
+            l.d $f6, ONE_DOUBLE
+            move $s4, $zero
 
-    		loopConverteDoubleInt:
-    			c.le.d $f0, $f4
-    			bc1t fimConversaoDoubleInt
+            loopConverteDoubleInt:
+                c.le.d $f0, $f4
+                bc1t fimConversaoDoubleInt
 
-    			add.d $f4, $f4, $f6
-    			addi $s4, $s4, 1
+                add.d $f4, $f4, $f6
+                addi $s4, $s4, 1
 
-    			j loopConverteDoubleInt
-    		fimConversaoDoubleInt:
+                j loopConverteDoubleInt
+            fimConversaoDoubleInt:
 
-    		# Pula o ponto se a posição atual for a do ponto
-    		bne $t1, $t0, diferentePosDot
-    		addi $t0, $t0, 1
+            # Pula o ponto se a posição atual for a do ponto
+            bne $t1, $t0, diferentePosDot
+            addi $t0, $t0, 1
 
-    		diferentePosDot:
-    		# Converte o dígito para char e armazena
-    		lb $t8, ZERO_CHAR
-    		add $t8, $s4, $t8
-    		add $t9, $t0, $a1
-    		sb $t8, 0($t9)
-    		addi $t0, $t0, 1
+            diferentePosDot:
+            # Converte o dígito para char e armazena
+            lb $t8, ZERO_CHAR
+            add $t8, $s4, $t8
+            add $t9, $t0, $a1
+            sb $t8, 0($t9)
+            addi $t0, $t0, 1
 
-    		move $t6, $zero
-    		l.d $f4, ZERO_DOUBLE
-    		l.d $f6, ONE_DOUBLE
+            move $t6, $zero
+            l.d $f4, ZERO_DOUBLE
+            l.d $f6, ONE_DOUBLE
 
-    		loopConverteIntDouble:
-    			beq $t6, $s4, fimConversaoIntDouble
+            loopConverteIntDouble:
+                beq $t6, $s4, fimConversaoIntDouble
 
-    			addi $t6, $t6, 1
-    			add.d $f4, $f4, $f6
+                addi $t6, $t6, 1
+                add.d $f4, $f4, $f6
 
-    			j loopConverteIntDouble
-    		fimConversaoIntDouble:
+                j loopConverteIntDouble
+            fimConversaoIntDouble:
 
-    		sub.d $f0, $f0, $f4
-    		l.d $f4, TEN_DOUBLE
-    		mul.d $f0, $f0, $f4
+            sub.d $f0, $f0, $f4
+            l.d $f4, TEN_DOUBLE
+            mul.d $f0, $f0, $f4
 
-    		j segundoWhile
+            j segundoWhile
         saidaSegundoWhile:
 
-		#Atribuição de '\0' na última posição, para finalizar a string
-		lb $t6, NULL_CHAR
-       	add $t8, $a1, $t0
-       	sb $t6, 0($t8)
+        #Atribuição de '\0' na última posição, para finalizar a string
+        lb $t6, NULL_CHAR
+        add $t8, $a1, $t0
+        sb $t6, 0($t8)
 
-       	move $v0, $t0
+        move $v0, $t0
 
         lw $s4, 0($sp)
         lw $s3, 4($sp)
